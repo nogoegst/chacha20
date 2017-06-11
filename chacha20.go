@@ -8,6 +8,7 @@
 package chacha20
 
 import (
+	"bytes"
 	"crypto/cipher"
 	"encoding/binary"
 	"errors"
@@ -193,24 +194,22 @@ func (c *Cipher) ReKey(key, nonce []byte) error {
 	c.state[1] = sigma1
 	c.state[2] = sigma2
 	c.state[3] = sigma3
-	c.state[4] = binary.LittleEndian.Uint32(key[0:4])
-	c.state[5] = binary.LittleEndian.Uint32(key[4:8])
-	c.state[6] = binary.LittleEndian.Uint32(key[8:12])
-	c.state[7] = binary.LittleEndian.Uint32(key[12:16])
-	c.state[8] = binary.LittleEndian.Uint32(key[16:20])
-	c.state[9] = binary.LittleEndian.Uint32(key[20:24])
-	c.state[10] = binary.LittleEndian.Uint32(key[24:28])
-	c.state[11] = binary.LittleEndian.Uint32(key[28:32])
+	kr := bytes.NewReader(key)
+	for i := 4; i < 12; i++ {
+		binary.Read(kr, binary.LittleEndian, &(c.state[i]))
+	}
 	c.state[12] = 0
+	noncer := bytes.NewReader(nonce)
 	if len(nonce) == INonceSize {
-		c.state[13] = binary.LittleEndian.Uint32(nonce[0:4])
-		c.state[14] = binary.LittleEndian.Uint32(nonce[4:8])
-		c.state[15] = binary.LittleEndian.Uint32(nonce[8:12])
+		for i := 13; i < 16; i++ {
+			binary.Read(noncer, binary.LittleEndian, &c.state[i])
+		}
 		c.ietf = true
 	} else {
 		c.state[13] = 0
-		c.state[14] = binary.LittleEndian.Uint32(nonce[0:4])
-		c.state[15] = binary.LittleEndian.Uint32(nonce[4:8])
+		for i := 14; i < 16; i++ {
+			binary.Read(noncer, binary.LittleEndian, &c.state[i])
+		}
 		c.ietf = false
 	}
 	c.off = BlockSize
@@ -245,18 +244,14 @@ func NewCipher(key, nonce []byte) (*Cipher, error) {
 // HChaCha is the HChaCha20 hash function used to make XChaCha.
 func HChaCha(key []byte, nonce *[HNonceSize]byte, out *[32]byte) {
 	var x [stateSize]uint32 // Last 4 slots unused, sigma hardcoded.
-	x[0] = binary.LittleEndian.Uint32(key[0:4])
-	x[1] = binary.LittleEndian.Uint32(key[4:8])
-	x[2] = binary.LittleEndian.Uint32(key[8:12])
-	x[3] = binary.LittleEndian.Uint32(key[12:16])
-	x[4] = binary.LittleEndian.Uint32(key[16:20])
-	x[5] = binary.LittleEndian.Uint32(key[20:24])
-	x[6] = binary.LittleEndian.Uint32(key[24:28])
-	x[7] = binary.LittleEndian.Uint32(key[28:32])
-	x[8] = binary.LittleEndian.Uint32(nonce[0:4])
-	x[9] = binary.LittleEndian.Uint32(nonce[4:8])
-	x[10] = binary.LittleEndian.Uint32(nonce[8:12])
-	x[11] = binary.LittleEndian.Uint32(nonce[12:16])
+	keyr := bytes.NewReader(key)
+	for i := 0; i < 8; i++ {
+		binary.Read(keyr, binary.LittleEndian, &x[i])
+	}
+	noncer := bytes.NewReader(nonce[:])
+	for i := 8; i < 12; i++ {
+		binary.Read(noncer, binary.LittleEndian, &x[i])
+	}
 	hChaChaRef(&x, out)
 }
 
